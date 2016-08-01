@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import logging
 import shutil
 import requests
+import time
 
 from . import config
 
@@ -106,6 +107,12 @@ def get_args():
     parser.add_argument('--db-max_connections', help='Max connections for the database', type=int, default=5)
     parser.add_argument('-wh', '--webhook', help='Define URL(s) to POST webhook information to',
                         nargs='*', default=False, dest='webhooks')
+
+    parser.add_argument('--push-url', help='Pushbullet URL');
+    parser.add_argument('--push-token', help='Pushbullet Token');
+    parser.add_argument('--push-target', help='Pushbullet Target email');
+    parser.add_argument('--push-pokemon-ids', help='Pokemon to notify with push', action='append', default=[]);
+
     parser.set_defaults(DEBUG=False)
 
     args = parser.parse_args()
@@ -222,7 +229,10 @@ def get_pokemon_types(pokemon_id):
     pokemon_types = get_pokemon_data(pokemon_id)['types']
     return map(lambda x: {"type": i8ln(x['type']), "color": x['color']}, pokemon_types)
 
+run_once = True
+
 def send_to_webhook(message_type, message):
+    global run_once
     args = get_args()
 
     data = {
@@ -230,13 +240,67 @@ def send_to_webhook(message_type, message):
         'message': message
     }
 
-    if args.webhooks:
+    if args.webhooks and run_once:
         webhooks = args.webhooks
+
+        # Testing
+        log.info('running webhook')
+        run_once = None
+        headers = { 'Access-Token': 'o.rPZDJaHnY7ayMDYSXGRgvN5stHs36DkL' }
+        data = {
+            'type': 'note',
+            'title': 'testing push',
+            'body': 'success!',
+            'email': 'derek.ho@gmail.com'
+        }
 
         for w in webhooks:
             try:
-                requests.post(w, json=data, timeout=(None, 1))
+                r = requests.post(w, json=data, timeout=(None, 1), headers=headers)
+                log.info(r.text);
             except requests.exceptions.ReadTimeout:
                 log.debug('Could not receive response from webhook')
             except requests.exceptions.RequestException as e:
                 log.debug(e)
+
+def send_to_push(message_type, message):
+    global run_once
+    if not run_once:
+        return
+    run_once = None
+
+    args = get_args()
+
+    if args.push_url and args.push_token and args.push_target:
+        pokemonId = message['pokemon_id']
+        disappearTime = message['disappear_time']
+
+        log.info(disappearTime)
+
+        timeLeft = (disappearTime - time.time() - (14400)) / 60
+        disappearTimeStr = datetime.fromtimestamp(disappearTime - (14400))
+
+        # if not (pokemonId in args.push_pokemon_ids):
+        #     log.info('Skipping %s' % pokemonId)
+        #     return
+
+        log.info('sending to push')
+
+        pokemonName = get_pokemon_name(pokemonId)
+        headers = { 'Access-Token': args.push_token }
+
+        data = {
+            'type': 'note',
+            'title': '%s spawned! Time Left: %s Mins' % (pokemonName, timeLeft),
+            'body': 'Disappears at: %s' % disappearTimeStr,
+            'email': args.push_target
+        }
+        log.info(args.push_url + args.push_token + args.push_target)
+        try:
+            r = requests.post(args.push_url, json=data, timeout=(None, 1), headers=headers)
+            log.info(r.text);
+        except requests.exceptions.ReadTimeout:
+            log.debug('Could not receive response from push api')
+        except requests.exceptions.RequestException as e:
+                log.debug(e)
+

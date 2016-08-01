@@ -14,7 +14,8 @@ from datetime import datetime, timedelta
 from base64 import b64encode
 
 from . import config
-from .utils import get_pokemon_name, get_pokemon_rarity, get_pokemon_types, get_args, send_to_webhook
+from .utils import get_pokemon_name, get_pokemon_rarity, get_pokemon_types,\
+                   get_args, send_to_webhook, send_to_push
 from .transform import transform_from_wgs_to_gcj
 from .customLog import printPokemon
 
@@ -274,6 +275,7 @@ def parse_map(map_dict, iteration_num, step, step_location):
                 }
 
                 send_to_webhook('pokemon', webhook_data)
+                send_to_push('pokemon', webhook_data)
 
         if iteration_num > 0 or step > 50:
             for f in cell.get('forts', []):
