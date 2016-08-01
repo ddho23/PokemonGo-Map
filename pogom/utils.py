@@ -264,25 +264,24 @@ def send_to_webhook(message_type, message):
                 log.debug(e)
 
 def send_to_push(message_type, message):
-    global run_once
-    if not run_once:
-        return
-    run_once = None
+    # global run_once
+    # if not run_once:
+    #     return
+    # run_once = None
 
     args = get_args()
 
     if args.push_url and args.push_token and args.push_target:
         pokemonId = message['pokemon_id']
+        pokemonRarity = get_pokemon_rarity(pokemonId)
         disappearTime = message['disappear_time']
-
-        log.info(disappearTime)
 
         timeLeft = (disappearTime - time.time() - (14400)) / 60
         disappearTimeStr = datetime.fromtimestamp(disappearTime - (14400))
 
-        # if not (pokemonId in args.push_pokemon_ids):
-        #     log.info('Skipping %s' % pokemonId)
-        #     return
+        if not (pokemonId in args.push_pokemon_ids or ('Very Rare' in pokemonRarity) or ('Ultra Rare' in pokemonRarity)):
+            log.info('Skipping %s' % pokemonId)
+            return
 
         log.info('sending to push')
 
