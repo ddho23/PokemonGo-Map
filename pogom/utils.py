@@ -261,10 +261,7 @@ def get_pokemon_types(pokemon_id):
     pokemon_types = get_pokemon_data(pokemon_id)['types']
     return map(lambda x: {"type": i8ln(x['type']), "color": x['color']}, pokemon_types)
 
-run_once = True
-
 def send_to_webhook(message_type, message):
-    global run_once
     args = get_args()
 
     data = {
@@ -272,23 +269,12 @@ def send_to_webhook(message_type, message):
         'message': message
     }
 
-    if args.webhooks and run_once:
+    if args.webhooks:
         webhooks = args.webhooks
-
-        # Testing
-        log.info('running webhook')
-        run_once = None
-        headers = { 'Access-Token': 'o.rPZDJaHnY7ayMDYSXGRgvN5stHs36DkL' }
-        data = {
-            'type': 'note',
-            'title': 'testing push',
-            'body': 'success!',
-            'email': 'derek.ho@gmail.com'
-        }
 
         for w in webhooks:
             try:
-                r = requests.post(w, json=data, timeout=(None, 1), headers=headers)
+                r = requests.post(w, json=data, timeout=(None, 1))
                 log.info(r.text);
             except requests.exceptions.ReadTimeout:
                 log.debug('Response timeout on webhook endpoint %s', w)
@@ -296,11 +282,6 @@ def send_to_webhook(message_type, message):
                 log.debug(e)
 
 def send_to_push(message_type, message):
-    # global run_once
-    # if not run_once:
-    #     return
-    # run_once = None
-
     args = get_args()
 
     if args.push_url and args.push_token and args.push_target:
@@ -308,7 +289,7 @@ def send_to_push(message_type, message):
         pokemonRarity = get_pokemon_rarity(pokemonId)
         disappearTime = message['disappear_time']
 
-        timeLeft = (disappearTime - time.time() - (14400)) / 60
+        timeLeft = message['time_until_hidden_ms'] / 60000
         disappearTimeStr = datetime.fromtimestamp(disappearTime - (14400))
 
         if not (pokemonId in args.push_pokemon_ids or ('Very Rare' in pokemonRarity) or ('Ultra Rare' in pokemonRarity)):
